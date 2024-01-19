@@ -16,26 +16,31 @@ class GroceryScreen extends StatefulWidget {
 }
 
 class _GroceryScreenState extends State<GroceryScreen> {
-  final List<GroceryItem> _groceryList = [];
+  List<GroceryItem> _groceryList = [];
+  bool _isLoading = true;
   void _loadItems() async {
     final url = Uri.https(
         'flutter-grocery-app-46cd0-default-rtdb.firebaseio.com',
         'shopping-list.json');
     final response = await http.get(url);
-    print(response.body);
 
-    final Map<String, Map<String, dynamic>> listData =
-        json.decode(response.body);
+    final Map<String, dynamic> listData = json.decode(response.body);
     final List<GroceryItem> loadedItemsList = [];
     for (final item in listData.entries) {
-      final category = categories.entries.firstWhere((element) => item.value['category']== element.key);
-      // loadedItemsList.add(GroceryItem(
-      //   id: item.key,
-      //   name: item.value['name'],
-      //   quantity: item.value['quantity'],
-        // category: Category(name, color),
-    //  ));
+      final Category caTegory = categories.entries
+          .firstWhere((element) => item.value['category'] == element.value.name)
+          .value;
+      loadedItemsList.add(GroceryItem(
+        id: item.key,
+        name: item.value['name'],
+        quantity: item.value['quantity'],
+        category: caTegory,
+      ));
     }
+    setState(() {
+      _groceryList = loadedItemsList;
+      _isLoading = false;
+    });
   }
 
   @override
@@ -59,34 +64,41 @@ class _GroceryScreenState extends State<GroceryScreen> {
           IconButton(
               icon: const Icon(Icons.add),
               onPressed: () async {
-                await Navigator.of(context)
+                final newItem = await Navigator.of(context)
                     .push<GroceryItem>(MaterialPageRoute(builder: (ctx) {
                   return const NewItemScreen();
                 }));
-                final url = Uri.https(
-                    'flutter-grocery-app-46cd0-default-rtdb.firebaseio.com',
-                    'shopping-list.json');
-                _loadItems();
+                if (newItem == null) {
+                  return;
+                }
+                setState(() {
+                  _groceryList.add(newItem);
+                });
+                //_loadItems();
               })
         ],
       ),
-      body: _groceryList.isEmpty
+      body: _isLoading
           ? const Center(
-              child: Text("Add Some Items!"),
+              child: CircularProgressIndicator.adaptive(),
             )
-          : ListView.builder(
-              itemCount: _groceryList.length,
-              itemBuilder: (BuildContext ctx, int index) {
-                return Dismissible(
-                    key: ValueKey(_groceryList[index].id),
-                    onDismissed: (dir) {
-                      setState(() async {
-                        _groceryList.remove(_groceryList[index]);
-                      });
-                    },
-                    child: GroceryItemWidget(item: _groceryList[index]));
-              },
-            ),
+          : _groceryList.isEmpty
+              ? const Center(
+                  child: Text("Add Some Items!"),
+                )
+              : ListView.builder(
+                  itemCount: _groceryList.length,
+                  itemBuilder: (BuildContext ctx, int index) {
+                    return Dismissible(
+                        key: ValueKey(_groceryList[index].id),
+                        onDismissed: (dir) {
+                          setState(() {
+                            _groceryList.remove(_groceryList[index]);
+                          });
+                        },
+                        child: GroceryItemWidget(item: _groceryList[index]));
+                  },
+                ),
     );
   }
 }
