@@ -24,44 +24,67 @@ class _GroceryScreenState extends State<GroceryScreen> {
         'flutter-grocery-app-46cd0-default-rtdb.firebaseio.com',
         'shopping-list.json');
 
-    final response = await http.get(url);
-    if (response.statusCode < 400) {
-      final Map<String, dynamic> listData = json.decode(response.body);
-      final List<GroceryItem> loadedItemsList = [];
-      for (final item in listData.entries) {
-        final Category caTegory = categories.entries
-            .firstWhere(
-                (element) => item.value['category'] == element.value.name)
-            .value;
-        loadedItemsList.add(GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: caTegory,
-        ));
+    try {
+      final response = await http.get(url);
+      if (response.statusCode < 400) {
+        if (response.body == "null") {
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+        final Map<String, dynamic> listData = json.decode(response.body);
+        final List<GroceryItem> loadedItemsList = [];
+        for (final item in listData.entries) {
+          final Category caTegory = categories.entries
+              .firstWhere(
+                  (element) => item.value['category'] == element.value.name)
+              .value;
+          loadedItemsList.add(GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: caTegory,
+          ));
+        }
+        setState(() {
+          _groceryList = loadedItemsList;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = "Failed to fetch data. Please Try again later.";
+        });
       }
+    } catch (e) {
       setState(() {
-        _groceryList = loadedItemsList;
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
-        _error = "Failed to fetch data. Please Try again later.";
+        _error = "Something went wrong! Please check your internet connection.";
       });
     }
   }
 
-  _removeItem(item) async {
+  void _removeItem(item) async {
     final index = _groceryList.indexOf(item);
     setState(() {
       _groceryList.remove(item);
     });
     final url = Uri.https(
         'flutter-grocery-app-46cd0-default-rtdb.firebaseio.com',
-        'shopping-list/${_groceryList[index].id}.json');
+        'shopping-list/${item.id}.json');
+
     final response = await http.delete(url);
     if (response.statusCode >= 400) {
       setState(() {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text("Failed to delete item."),
+          duration: const Duration(seconds: 2),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
+          backgroundColor: Theme.of(context).colorScheme.tertiary,
+          behavior: SnackBarBehavior.floating,
+          elevation: 4,
+          margin: const EdgeInsets.all(10.0),
+        ));
         _groceryList.insert(index, item);
       });
     }
@@ -97,7 +120,6 @@ class _GroceryScreenState extends State<GroceryScreen> {
                   }
                   setState(() {
                     _groceryList.add(newItem);
-                    print(_groceryList);
                   });
                 })
           ],
@@ -124,7 +146,11 @@ class _GroceryScreenState extends State<GroceryScreen> {
                         },
                       )
             : Center(
-                child: Text(_error!),
+                child: Center(
+                    child: Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                )),
               ));
   }
 }
